@@ -10,12 +10,11 @@ public class doorMove : MonoBehaviour
 
     void Awake()
     {
-        myTraceAgent = transform.Find("autoDoor").GetComponent<NavMeshAgent>();
+        offmesh = gameObject.GetComponent<OffMeshLink>();
     }
 
     // Update is called once per frame
     void Update()
     {
-        
     }
 }
