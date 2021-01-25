@@ -292,7 +292,7 @@ public class EnemyCtrl : MonoBehaviour
         {
             if(Time.time>hungryTime)
             {
-                RoamingCheckStart();
+                //RoamingCheckStart();
                 hungry = true;
                 nonHungryTime = Time.time + nonHungryTimeSet + Rand.Range(10f, 15f);
                 nonHungry = true;
