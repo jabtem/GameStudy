@@ -635,4 +635,86 @@ public class EnemyCtrl : MonoBehaviour
         traceAttack = false;
         traceObject = false;
     }
+
+    public void EnemyDie()
+    {
+        StartCoroutine(this.Die());
+    }
+    IEnumerator Die()
+    {
+        isDie = true;
+        _anim.CrossFade(anims.die.name, 0.3f);
+        enemyMode = MODE_STATE.die;
+        this.gameObject.tag = "Untagged";
+        this.gameObject.transform.Find("EnemyBody").tag = "Untagged";
+
+        myTraceAgent.isStopped = true;
+
+        foreach(Collider coll in gameObject.GetComponentsInChildren<Collider>())
+        {
+            coll.enabled = false;
+        }
+
+        yield return new WaitForSeconds(4.5f);
+        Destroy(gameObject);
+    }
+
+    public void EnemyBarrelDie(Vector3 firePos)
+    {
+        StartCoroutine(this.BarrelDie(firePos));
+    }
+    IEnumerator BarrelDie(Vector3 firePos)
+    {
+        isDie = true;
+
+        _anim.CrossFade(anims.die.name, 0.3f);
+        enemyMode = MODE_STATE.die;
+
+        this.gameObject.tag = "Untagged";
+        this.gameObject.transform.Find("EnemyBody").tag = "Untagged";
+        myTraceAgent.enabled = false;
+
+        Rigidbody rigid = GetComponent<Rigidbody>();
+        rigid.isKinematic = false;
+
+        rigid.mass = 1.0f;
+        //폭발력,원점,반경,위로솟구치는힘
+        rigid.AddExplosionForce(1000.0f, firePos, 15.0f, 300.0f);
+        yield return new WaitForSeconds(3.5f);
+        rigid.isKinematic = true;
+
+        foreach(Collider coll in gameObject.GetComponentsInChildren<Collider>())
+        {
+            coll.enabled = false;
+        }
+
+        yield return new WaitForSeconds(4.5f);
+        Destroy(gameObject);
+    }
+
+
+    void OnDestory()
+    {
+        Debug.Log("Destroy");
+        //모든 코루틴 정지
+        StopAllCoroutines();
+    }
+    public void HItEenmey()
+    {
+        int rand = Rand.Range(0, 100);
+        if(rand<30)
+        {
+            if(randAnim == 0 || randAnim == 1)
+            {
+                isHitTime = Time.time + anims.hit1.length + 0.2f;
+                isHit = true;
+            }
+            else if(randAnim == 1 || randAnim == 2)
+            {
+                isHitTime = Time.time + anims.hit1.length + 0.2f;
+                isHit = true;
+            }
+        }
+
+    }
 }

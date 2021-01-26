@@ -8,6 +8,8 @@ TagManager:
   - Enemy
   - Base
   - EnemyBody
+  - Bullet
+  - EnemyWeapon
   layers:
   - Default
   - TransparentFX
@@ -19,7 +21,7 @@ TagManager:
   - 
   - Barrel
   - Ground
-  - 
+  - Enemy
   - 
   - 
   - 
