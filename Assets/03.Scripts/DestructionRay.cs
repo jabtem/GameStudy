@@ -39,7 +39,7 @@ public class DestructionRay : MonoBehaviour
         //메인카메라에서 마우스커서 (vector3이나 z값무시한값(0~1280,0~800,0)의 위치 해상도따라다름
         ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 #if MODE_1
-        Debug.DrawRay(ray.origin, ray.direction * 150.0f, Color.green);
+        //Debug.DrawRay(ray.origin, ray.direction * 150.0f, Color.green);
 
 #elif MODE_2
         Debug.DrawRay(ray.origin, ray.direction * 100.0f, Color.red);
@@ -57,6 +57,10 @@ public class DestructionRay : MonoBehaviour
 
                     //오브젝트 제거
                     Destroy(hitInfo.collider.gameObject);
+                }
+                else if (hitInfo.collider.tag == "Barrel")
+                {
+                    GameObject.FindGameObjectWithTag("Player").GetComponent<PlayerCtrl>().BarrelFire(hitInfo.collider.gameObject.transform);
                 }
             }
         }

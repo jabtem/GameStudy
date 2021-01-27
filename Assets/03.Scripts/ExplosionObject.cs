@@ -52,7 +52,7 @@ public class ExplosionObject : MonoBehaviour
     IEnumerator ExpObject()
     {
 
-        //GameObject.Find("Player").GetComponent<PlayerCtrl>().barrelFire = false;
+        GameObject.Find("Player").GetComponent<PlayerCtrl>().barrelFire = false;
 
         Instantiate(exploEffect, myTr.position, Quaternion.identity);
 

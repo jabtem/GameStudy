@@ -13,7 +13,7 @@ public class BaseCtrl : MonoBehaviour
     public float dist2;
  
     private GameObject[] Enemys;
-    private Transform EnemyTarget;
+    public Transform EnemyTarget;
 
     //자신의 Transform 참조 변수
     private Transform myTr;
