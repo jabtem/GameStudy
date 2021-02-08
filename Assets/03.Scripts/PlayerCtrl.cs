@@ -95,8 +95,7 @@ public class PlayerCtrl : MonoBehaviour
     [HideInInspector]
     public bool barrelFire;
     public Transform barrelPos;
-
-
+    public bool isMine;
     void Awake()
     {
         myTraceAgent = GetComponent<NavMeshAgent>();
@@ -106,10 +105,18 @@ public class PlayerCtrl : MonoBehaviour
 
         source = GetComponent<AudioSource>();
         muzzleFlash.SetActive(false);
+
+        isMine = GetComponent<PhotonView>().isMine;
+
+        if(!isMine)
+        {
+            gameObject.tag = "Team";
+        }
     }
 
 IEnumerator Start()
     {
+
         yield return new WaitForSeconds(5.0f);
 
         // 일정 간격으로 주변의 가장 가까운 Enemy를 찾는 코루틴 

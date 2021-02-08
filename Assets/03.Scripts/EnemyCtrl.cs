@@ -214,7 +214,7 @@ public class EnemyCtrl : MonoBehaviour
 
 
 #if UNITY_EDITOR
-        Debug.Log("EDITOR");
+        //Debug.Log("EDITOR");
 #endif
 
 #if UNITY_IPHONE
@@ -624,7 +624,7 @@ public class EnemyCtrl : MonoBehaviour
         //로밍 타겟 셋팅
         roamingTarget = roamingCheck[roamingRandCheck];
 
-        Debug.Log("Checking1");
+        //Debug.Log("Checking1");
     }
     IEnumerator TraceObject()
     {

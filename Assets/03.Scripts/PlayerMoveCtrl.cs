@@ -21,6 +21,8 @@ public class PlayerMoveCtrl : MonoBehaviour
     // 케릭터 이동 방향
     Vector3 moveDirection;
 
+
+
     void Start()
     {
         // 레퍼런스 연결

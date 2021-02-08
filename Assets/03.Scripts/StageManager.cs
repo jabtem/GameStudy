@@ -7,7 +7,6 @@ public class StageManager : MonoBehaviour
 
     Transform[] EnemySpawnPoints;
     public BaseCtrl baseStart;
-    public PlayerCtrl playerStart;
 
     public GameObject Enemy;
 
