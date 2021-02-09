@@ -12,6 +12,7 @@ TagManager:
   - EnemyWeapon
   - Barrel
   - Team
+  - ROOM_ITEM
   layers:
   - Default
   - TransparentFX

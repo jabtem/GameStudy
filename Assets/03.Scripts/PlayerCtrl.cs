@@ -14,6 +14,7 @@ public class PlayerCtrl : MonoBehaviour
     [HideInInspector]
     public bool isDie;
 
+    public Text txtKillCount;
 
     private NavMeshAgent myTraceAgent;
 
@@ -96,6 +97,7 @@ public class PlayerCtrl : MonoBehaviour
     public bool barrelFire;
     public Transform barrelPos;
     public bool isMine;
+
     void Awake()
     {
         myTraceAgent = GetComponent<NavMeshAgent>();
@@ -108,10 +110,6 @@ public class PlayerCtrl : MonoBehaviour
 
         isMine = GetComponent<PhotonView>().isMine;
 
-        if(!isMine)
-        {
-            gameObject.tag = "Team";
-        }
     }
 
 IEnumerator Start()
@@ -259,7 +257,7 @@ IEnumerator Start()
 
 #if UNITY_EDITOR
 
-        if (Input.GetMouseButtonDown(0)&&!isDie)
+        if (Input.GetMouseButtonDown(0)&&!isDie&&isMine)
         {
             if(Physics.Raycast(ray,out hitInfo1, Mathf.Infinity,1 <<LayerMask.NameToLayer("Barrel")))
             {
