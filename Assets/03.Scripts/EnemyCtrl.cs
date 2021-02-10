@@ -133,6 +133,14 @@ public class EnemyCtrl : MonoBehaviour
     private bool nonHungry;
     private float isHitTime;
 
+    PhotonView pv = null;
+
+    Rigidbody myRbody;
+    Vector3 currPos = Vector3.zero;
+    Quaternion currRot = Quaternion.identity;
+
+    //애니메이션동기화
+    int net_Anim = 0;
     void Awake()
     {
         //이 부분은 단순 공부용/////////////////////////////////////////////////////////////////
@@ -250,11 +258,72 @@ public class EnemyCtrl : MonoBehaviour
 
         _anim = GetComponentInChildren<Animation>();
 
+        net_Anim = 0;
+
         myTr = GetComponent<Transform>();
 
         baseAll = GameObject.FindGameObjectsWithTag("Base");
 
         roamingCheck = GameObject.Find("RoamingPoint").GetComponentsInChildren<Transform>();
+
+        //포톤 추가////////////////////////////////////////////////////////////
+
+        //컴포넌트를 할당 
+        myRbody = GetComponent<Rigidbody>();
+
+        //PhotonView 컴포넌트 할당 
+        pv = GetComponent<PhotonView>();
+
+        /*
+         * PhotonView 컴포넌트의 Observe 속성에 특정 스크립트를 연결하면
+         * PhotonView 컴포넌트는 해당 스크립트에 있는 OnPhotonSerializeView 콜백 함수를 통해
+         * 데이터를 전송주기에 맞춰 송/수신하는 역할을 함.
+         * 
+         * 다음의 두 가지 방법으로 PhotonView 컴포넌트의 Observe 속성에
+         * 특정 스크립트를 연결할 수 있다.
+         * 
+         * 1)Resources 폴더 안에 있는 MainPlayer 프리팹을 선택하고 Inspector 뷰의 
+         * PlayerCtrl 컴포넌트(스크립트) 헤더를 드래그드롭해서 PhotonView 컴포넌트의 Observe옵션에 연결
+         * 
+         * 2)다음과 같이 스크립트에서 직접 연결
+         */
+
+        //PhotonView Observed Components 속성에 PlayerCtrl(현재) 스크립트 Component를 연결
+        pv.ObservedComponents[0] = this;
+
+        /*
+         * PhotonView 컴포넌트의 Observe option 속성
+         * 옵션                           설명
+         * off                            실시간 데이터 송수신을 하지 않음.
+         * ReliableDeltaCompressed        데이터를 정확히 송수신한다(TCP/IP 프로토콜)
+         * Unreliable                     데이터의 정합성을 보장할 수 없지만 속도가 빠르다(UDP 프로토콜)
+         * UnreliableOnChange             Unreliable 옵션과 같지만 변경사항이 발생했을 경우에만 전송한다
+         */
+
+        //데이타 전송 타입을 설정
+        pv.synchronization = ViewSynchronization.UnreliableOnChange;
+
+        //자신의 네트워크 객체가 아닐때...(마스터 클라이언트가 아닐때)
+        if (!PhotonNetwork.isMasterClient)
+        {
+            //원격 네트워크 유저의 아바타는 물리력을 안받게 처리하고
+            //또한, 물리엔진으로 이동 처리하지 않고(Rigidbody로 이동 처리시...)
+            //실시간 위치값을 전송받아 처리 한다 그러므로 Rigidbody 컴포넌트의
+            //isKinematic 옵션을 체크해주자. 한마디로 물리엔진의 영향에서 벗어나게 하여
+            //불필요한 물리연산을 하지 않게 해주자...
+
+            //원격 네트워크 플레이어의 아바타는 물리력을 이용하지 않음 (마스터 클라이언트가 아닐때)
+            //(원래 게임이 이렇다는거다...우리건 안해도 체크 돼있음...)
+            myRbody.isKinematic = true;
+            //네비게이션도 중지
+            //myTraceAgent.isStopped = true; 이걸로 하면 off Mesh Link 에서 에러 발생 그냥 비활성 하자
+            myTraceAgent.enabled = false;
+        }
+
+        // 원격 플래이어의 위치 및 회전 값을 처리할 변수의 초기값 설정 
+        // 잘 생각해보자 이런처리 안하면 순간이동 현상을 목격
+        currPos = myTr.position;
+        currRot = myTr.rotation;
     }
 
     // Start is called before the first frame update
@@ -268,6 +337,10 @@ public class EnemyCtrl : MonoBehaviour
         _anim.clip = anims.idle1;
         _anim.Play();
 
+        if(PhotonNetwork.isMasterClient)
+        {
+
+
         traceTarget = baseAll[0].transform;
         myTraceAgent.SetDestination(traceTarget.position);
 
@@ -276,6 +349,11 @@ public class EnemyCtrl : MonoBehaviour
         StartCoroutine(this.TargetSetting());
         RoamingCheckStart();
 
+        }
+        else
+        {
+            StartCoroutine(this.NetAnim());
+        }
         yield return null;
     }
 
@@ -329,6 +407,22 @@ public class EnemyCtrl : MonoBehaviour
                     enemyLookTime = Time.time + 0.01f;
                 }
             }*/
+        //포톤 추가
+        // 마스터 클라이언트가 직접 Ai 및 애니메이션 로직 수행
+        // pv.isMine 해도 됨
+        if (PhotonNetwork.isMasterClient)
+        {
+            // 처리
+        }
+        //포톤 추가
+        //원격 플레이어일 때 수행
+        else
+        {
+            //원격 플레이어의 아바타를 수신받은 위치까지 부드럽게 이동시키자
+            myTr.position = Vector3.Lerp(myTr.position, currPos, Time.deltaTime * 3.0f);
+            //원격 플레이어의 아바타를 수신받은 각도만큼 부드럽게 회전시키자
+            myTr.rotation = Quaternion.Slerp(myTr.rotation, currRot, Time.deltaTime * 3.0f);
+        }
     }
 
     [ContextMenu("FuncStart")]
@@ -394,18 +488,22 @@ public class EnemyCtrl : MonoBehaviour
                     if(randAnim ==0)
                     {
                         _anim.CrossFade(anims.idle1.name, 0.3f);
+                        net_Anim = 0;
                     }
                     else if (randAnim == 1)
                     {
                         _anim.CrossFade(anims.idle2.name, 0.3f);
+                        net_Anim = 1;
                     }
                     else if (randAnim == 2)
                     {
                         _anim.CrossFade(anims.idle3.name, 0.3f);
+                        net_Anim = 2;
                     }
                     else if (randAnim == 3)
                     {
                         _anim.CrossFade(anims.idle4.name, 0.3f);
+                        net_Anim = 3;
                     }
                     break;
 
@@ -418,6 +516,7 @@ public class EnemyCtrl : MonoBehaviour
                         myTraceAgent.speed = speed * 1.8f;
                         _anim[anims.move.name].speed = 1.8f;
                         _anim.CrossFade(anims.move.name, 0.3f);
+                        net_Anim = 4;
                     }
                     else
                     {
@@ -428,6 +527,7 @@ public class EnemyCtrl : MonoBehaviour
 
                         //run 애니메이션 
                         _anim.CrossFade(anims.move.name, 0.3f);
+                        net_Anim = 5;
                     }
                     break;
 
@@ -442,21 +542,25 @@ public class EnemyCtrl : MonoBehaviour
                     {
                         //attack1 애니메이션 
                         _anim.CrossFade(anims.attack1.name, 0.3f);
+                        net_Anim = 6;
                     }
                     else if (randAnim == 1)
                     {
                         //attack2 애니메이션 
                         _anim.CrossFade(anims.attack2.name, 0.3f);
+                        net_Anim = 7;
                     }
                     else if (randAnim == 2)
                     {
                         //attack3 애니메이션 
                         _anim.CrossFade(anims.attack3.name, 0.3f);
+                        net_Anim = 8;
                     }
                     else if (randAnim == 3)
                     {
                         //attack3 애니메이션 
                         _anim.CrossFade(anims.attack4.name, 0.3f);
+                        net_Anim = 9;
                     }
                     break;
                 case MODE_STATE.move:
@@ -477,6 +581,7 @@ public class EnemyCtrl : MonoBehaviour
 
                         //run 애니메이션 
                         _anim.CrossFade(anims.move.name, 0.3f);
+                        net_Anim = 10;
 
                     }
                     else
@@ -489,6 +594,7 @@ public class EnemyCtrl : MonoBehaviour
 
                         //walk 애니메이션 
                         _anim.CrossFade(anims.move.name, 0.3f);
+                        net_Anim = 11;
 
                     }
                     break;
@@ -498,6 +604,7 @@ public class EnemyCtrl : MonoBehaviour
                         traceObject = true;
                         myTraceAgent.isStopped = true;
                         _anim.CrossFade(anims.surprise.name, 0.3f);
+                        net_Anim = 12;
                         StartCoroutine(this.TraceObject());
                     }
                     break;
@@ -511,6 +618,7 @@ public class EnemyCtrl : MonoBehaviour
 
                     //sleep 애니메이션 
                     _anim.CrossFade(anims.sleep.name, 0.3f);
+                    net_Anim = 13;
                     break;
                 case MODE_STATE.hit:
                     myTraceAgent.isStopped = true;
@@ -518,10 +626,12 @@ public class EnemyCtrl : MonoBehaviour
                     if(randAnim ==0 || randAnim == 1)
                     {
                         _anim.CrossFade(anims.hit1.name, 0.3f);
+                        net_Anim = 14;
                     }
                     else if(randAnim ==1 || randAnim ==2)
                     {
                         _anim.CrossFade(anims.hit2.name, 0.3f);
+                        net_Anim = 15;
                     }
                     break;
 
@@ -638,7 +748,8 @@ public class EnemyCtrl : MonoBehaviour
 
     public void EnemyDie()
     {
-        StartCoroutine(this.Die());
+        if(pv.isMine)
+            StartCoroutine(this.Die());
     }
     IEnumerator Die()
     {
@@ -656,7 +767,7 @@ public class EnemyCtrl : MonoBehaviour
         }
 
         yield return new WaitForSeconds(4.5f);
-        Destroy(gameObject);
+        PhotonNetwork.Destroy(gameObject);
     }
 
     public void EnemyBarrelDie(Vector3 firePos)
@@ -668,6 +779,7 @@ public class EnemyCtrl : MonoBehaviour
         isDie = true;
 
         _anim.CrossFade(anims.die.name, 0.3f);
+        net_Anim = 16;
         enemyMode = MODE_STATE.die;
 
         this.gameObject.tag = "Untagged";
@@ -689,7 +801,7 @@ public class EnemyCtrl : MonoBehaviour
         }
 
         yield return new WaitForSeconds(4.5f);
-        Destroy(gameObject);
+        PhotonNetwork.Destroy(gameObject);
     }
 
 
@@ -717,4 +829,206 @@ public class EnemyCtrl : MonoBehaviour
         }
 
     }
+    // 포톤 추가///////////////////////////////////////////////////////////////////////
+
+    /*
+	 * 마스터 클라이언트가 아닐때 애니메이션 상태를 동기화 하는 로직
+     * RPC 로도 애니메이션 동기화 가능~!
+	 */
+    IEnumerator NetAnim()
+    {
+        while (!isDie)
+        {
+            yield return new WaitForSeconds(0.2f);
+
+            if (!PhotonNetwork.isMasterClient)
+            {
+                if (net_Anim == 0)
+                {
+                    _anim.CrossFade(anims.idle1.name, 0.3f);
+                }
+                else if (net_Anim == 1)
+                {
+                    _anim.CrossFade(anims.idle2.name, 0.3f);
+                }
+                else if (net_Anim == 2)
+                {
+                    _anim.CrossFade(anims.idle3.name, 0.3f);
+                }
+                else if (net_Anim == 3)
+                {
+                    _anim.CrossFade(anims.idle4.name, 0.3f);
+                }
+                else if (net_Anim == 4)
+                {
+                    //애니메이션 속도 변경
+                    _anim[anims.move.name].speed = 1.8f;
+
+                    //run 애니메이션 
+                    _anim.CrossFade(anims.move.name, 0.3f);
+                }
+                else if (net_Anim == 5)
+                {
+                    //애니메이션 속도 변경
+                    _anim[anims.move.name].speed = 1.5f;
+
+                    //run 애니메이션 
+                    _anim.CrossFade(anims.move.name, 0.3f);
+                }
+                else if (net_Anim == 6)
+                {
+                    //attack1 애니메이션 
+                    _anim.CrossFade(anims.attack1.name, 0.3f);
+                }
+                else if (net_Anim == 7)
+                {
+                    //attack2 애니메이션 
+                    _anim.CrossFade(anims.attack2.name, 0.3f);
+                }
+                else if (net_Anim == 8)
+                {
+                    //attack3 애니메이션 
+                    _anim.CrossFade(anims.attack3.name, 0.3f);
+                }
+                else if (net_Anim == 9)
+                {
+                    //attack4 애니메이션 
+                    _anim.CrossFade(anims.attack4.name, 0.3f);
+                }
+                else if (net_Anim == 10)
+                {
+                    //애니메이션 속도 변경
+                    _anim[anims.move.name].speed = 1.2f;
+
+                    //run 애니메이션 
+                    _anim.CrossFade(anims.move.name, 0.3f);
+                }
+                else if (net_Anim == 11)
+                {
+                    //애니메이션 속도 변경
+                    _anim[anims.move.name].speed = 1.0f;
+
+                    //walk 애니메이션 
+                    _anim.CrossFade(anims.move.name, 0.3f);
+                }
+                else if (net_Anim == 12)
+                {
+                    //roar 애니메이션 
+                    _anim.CrossFade(anims.surprise.name, 0.3f);
+                }
+                else if (net_Anim == 13)
+                {
+                    //sleep 애니메이션 
+                    _anim.CrossFade(anims.sleep.name, 0.3f);
+                }
+                else if (net_Anim == 14)
+                {
+                    // hit1 애니메이션 
+                    _anim.CrossFade(anims.hit1.name, 0.3f);
+                }
+                else if (net_Anim == 15)
+                {
+                    // hit2 애니메이션 
+                    _anim.CrossFade(anims.hit2.name, 0.3f);
+                }
+                else if (net_Anim == 16)
+                {
+                    //죽는 애니메이션 시작
+                    _anim.CrossFade(anims.die.name, 0.3f);
+
+                    // 코루틴 함수를 빠져나감(종료)
+                    yield break;
+                }
+
+            }
+        }
+
+    }
+
+    /*
+     * PhotonView 컴포넌트의 Observe 속성이 스크립트 컴포넌트로 지정되면 PhotonView
+     * 컴포넌트는 데이터를 송수신할 때, 해당 스크립트의 OnPhotonSerializeView 콜백 함수를 호출한다. 
+     */
+    void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
+    {
+        //로컬 플레이어의 위치 정보를 송신
+        if (stream.isWriting)
+        {
+            //박싱
+            stream.SendNext(myTr.position);
+            stream.SendNext(myTr.rotation);
+            stream.SendNext(net_Anim);
+        }
+        //원격 플레이어의 위치 정보를 수신
+        else
+        {
+            //언박싱
+            currPos = (Vector3)stream.ReceiveNext();
+            currRot = (Quaternion)stream.ReceiveNext();
+            net_Anim = (int)stream.ReceiveNext();
+        }
+
+    }
+
+    // 마스터 클라이언트가 변경되면 호출
+    void OnMasterClientSwitched(PhotonPlayer newMasterClient)
+    {
+        if (PhotonNetwork.isMasterClient)
+        {
+            //일단 첫 Base의 Transform만 연결
+            traceTarget = baseAll[0].transform;
+
+            //추적하는 대상의 위치(Vector3)를 셋팅하면 바로 추적 시작 (가독성이 좋다)
+            myTraceAgent.SetDestination(traceTarget.position);
+            // 위와 같은 동작을 수행하지만...가독성이 별로다
+            // myTraceAgent.destination = traceObj.position;
+
+            // 정해진 시간 간격으로 Enemy의 Ai 변화 상태를 셋팅하는 코루틴
+            StartCoroutine(ModeSet());
+
+            // Enemy의 상태 변화에 따라 일정 행동을 수행하는 코루틴
+            StartCoroutine(ModeAction());
+
+            // 일정 간격으로 주변의 가장 가까운 Base와 플레이어를 찾는 코루틴 
+            StartCoroutine(this.TargetSetting());
+
+            // 로밍 루트 설정
+            RoamingCheckStart();
+
+            //myRbody.isKinematic = false;
+            //네비게이션도 실행
+            myTraceAgent.enabled = true;
+        }
+    }
+
+    /*
+
+    // 다음은 마스터 클라이언트의 명시적 변경을 예를 든거다
+
+    // 접속 플레이어 정보 추가
+    List<PhotonPlayer> setPlayer;
+
+    //네트워크 플레이어가 룸으로 접속했을 때 호출되는 콜백 함수
+    //PhotonPlayer 클래스 타입의 파라미터가 전달(서버에서...)
+    //PhotonPlayer 파라미터는 해당 네트워크 플레이어의 정보를 담고 있다.
+    void OnPhotonPlayerConnected(PhotonPlayer newPlayer)
+    {
+        // 플레이어 ID (접속 순번), 이름, 커스텀 속성
+        Debug.Log(newPlayer.ToStringFull());
+
+        if(PhotonNetwork.isMasterClient)
+        {
+            setPlayer.Add(newPlayer);
+        }
+
+    }
+
+    // 마스터 클라이언트만 아래 함수 호출
+    // 마스터 클라이언트 명시적 변경
+    void SetMasterClient()
+    {
+        PhotonNetwork.SetMasterClient(setPlayer[0]);
+    }
+
+    */
 }

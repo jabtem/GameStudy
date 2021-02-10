@@ -14,8 +14,6 @@ public class PlayerCtrl : MonoBehaviour
     [HideInInspector]
     public bool isDie;
 
-    public Text txtKillCount;
-
     private NavMeshAgent myTraceAgent;
 
     Vector3 movePoint = Vector3.zero;
@@ -82,6 +80,8 @@ public class PlayerCtrl : MonoBehaviour
     //애니메이터 연결
     Animator myAnim;
 
+    int initLife = 100;
+
     //플레이어 라이프
     public int life;
     //플레이어 라이프 바
@@ -95,8 +95,52 @@ public class PlayerCtrl : MonoBehaviour
     //드럼통 파괴
     [HideInInspector]
     public bool barrelFire;
-    public Transform barrelPos;
-    public bool isMine;
+    Transform barrelPos;
+
+    //포톤 추가///////////////////////////////////////////////////////
+    /*
+     * PhotonView : PhotonView 컴포넌트는 네트워크상에 접속한 
+     * 유저 간의 데이타를 송/수신하는 통신 모듈
+     * 
+     * 역할 : 동일 룸에 입장한 다른 유저에게 게임오브젝트 또는 프리팹을 거의 동시에
+     * 생성하거나 서로 데이터를 송수신하려면 ( (Ex) 로컬 오브젝트와 아바타 오브젝트) 반드시 필요한 컴포넌트이다.
+     * 
+     * 참고 : PhotonView 컴포넌트는 유니티 빌트인 네트워크 API의
+     * NetworkView 컴포넌트와 동일한 기능(역할)을 하며 속성 도 유사함.
+     * 
+     * PhotonView 컴포넌트의 속성 View ID는 PhotonView 컴포넌트별 고유ID를 의미한다.
+     * 네트워크 유저가 접속한 순서대로 1001, 2001, 3001, ....순으로 1000번 간격으로 자동부여 된다.
+     * 그리고 물리적으로 하나의 네트워크 플레이어에게 추가할 수 있는 PhotonView 컴포넌트는 1000개로
+     * 제한 되어있다. 그러므로 첫 번째 접속한 플레이어의 PhotonView 컴포넌트가 여러개 추가돼있다면
+     * View ID는 1001, 1002, 1003, ...과 같은 규칙으로 부여됨 즉 프로젝트에서 만들어진 순서로...
+     * 
+     * PhotonView 컴포넌트의 속성 Controlled locally 는 bool형 타입으로
+     * 이 속성의 체크 여부로 어느 플레이어 객체가 자신의 것인지 판단할 수 있음
+     * 
+     * 
+     */
+
+    // 포톤 추가///////////////////////////////////////////////////////////////////////
+
+    //참조할 컴포넌트를 할당할 레퍼런스 (미리 할당하는게 좋음)
+    Rigidbody myRbody;
+
+    //PhotonView 컴포넌트를 할당할 레퍼런스 
+    PhotonView pv = null;
+
+    //메인 카메라가 추적할 CamPivot(플레이어) 게임오브젝트 
+    public Transform camPivot;
+
+    //위치 정보를 송수신할 때 사용할 변수 선언 및 초기값 설정 
+    Vector3 currPos = Vector3.zero;
+    Quaternion currRot = Quaternion.identity;
+
+    //플레이어 하위의 Canvas 객체를 연결할 레퍼런스->Canvas 컴포넌트를 연결 
+    public Canvas hudCanvas;
+    //Filled 타입의 Image UI 항목을 연결할 레퍼런스->Image 컴포넌트 연결 
+    public Image hpBar;
+    //플레이어의 HUD에 표현할 스코어 Text UI 항목 연결 레퍼런스
+    public Text txtKillCount;
 
     void Awake()
     {
@@ -108,25 +152,106 @@ public class PlayerCtrl : MonoBehaviour
         source = GetComponent<AudioSource>();
         muzzleFlash.SetActive(false);
 
-        isMine = GetComponent<PhotonView>().isMine;
+        //포톤 추가////////////////////////////////////////////////////////////
 
+        // 네트워크 버전으로 변경하면서 링크가 깨졌으니 스크립트로 다시 연결~
+        lifeBar = GameObject.Find("HpBar").GetComponent<Image>();
+
+        //컴포넌트를 할당 
+        myRbody = GetComponent<Rigidbody>();
+
+        //PhotonView 컴포넌트 할당 
+        pv = GetComponent<PhotonView>();
+
+        /*
+         * PhotonView 컴포넌트의 Observe 속성에 특정 스크립트를 연결하면
+         * PhotonView 컴포넌트는 해당 스크립트에 있는 OnPhotonSerializeView 콜백 함수를 통해
+         * 데이터를 전송주기에 맞춰 송/수신하는 역할을 함.
+         * 
+         * 다음의 두 가지 방법으로 PhotonView 컴포넌트의 Observe 속성에
+         * 특정 스크립트를 연결할 수 있다.
+         * 
+         * 1)Resources 폴더 안에 있는 MainPlayer 프리팹을 선택하고 Inspector 뷰의 
+         * PlayerCtrl 컴포넌트(스크립트) 헤더를 드래그드롭해서 PhotonView 컴포넌트의 Observe옵션에 연결
+         * 
+         * 2)다음과 같이 스크립트에서 직접 연결
+         */
+
+        //PhotonView Observed Components 속성에 PlayerCtrl(현재) 스크립트 Component를 연결
+        pv.ObservedComponents[0] = this;
+
+        /*
+         * PhotonView 컴포넌트의 Observe option 속성
+         * 옵션                           설명
+         * off                            실시간 데이터 송수신을 하지 않음.
+         * ReliableDeltaCompressed        데이터를 정확히 송수신한다(TCP/IP 프로토콜)
+         * Unreliable                     데이터의 정합성을 보장할 수 없지만 속도가 빠르다(UDP 프로토콜)
+         * UnreliableOnChange             Unreliable 옵션과 같지만 변경사항이 발생했을 경우에만 전송한다
+         */
+
+        //데이타 전송 타입을 설정
+        pv.synchronization = ViewSynchronization.UnreliableOnChange;
+
+        //PhotonView.isMine 속성은 bool형 타입으로 자신이 만든 네트워크 게임오브젝트 여부를 판단할 때 사용
+        //PhotonView가 자신의 플레이어일 경우 즉, 자신의 PhotonView 여부 판단
+        if (pv.isMine)  // PhotonNetwork.isMasterClient 마스터 클라이언트는 이런식 체크
+        {
+            //메인 카메라에 추가된 SmoothFollowCam 스크립트(컴포넌트)에 추적 대상을 연결 
+            Camera.main.GetComponent<smoothFollowCam>().target = camPivot;
+
+        }
+        //자신의 네트워크 객체가 아닐때...
+        else
+        {
+            //원격 네트워크 유저의 아바타는 물리력을 안받게 처리하고
+            //또한, 물리엔진으로 이동 처리하지 않고(Rigidbody로 이동 처리시...)
+            //실시간 위치값을 전송받아 처리 한다 그러므로 Rigidbody 컴포넌트의
+            //isKinematic 옵션을 체크해주자. 한마디로 물리엔진의 영향에서 벗어나게 하여
+            //불필요한 물리연산을 하지 않게 해주자...(만약 수십명의 플레이어가 접속 한다면???)
+
+            //원격 네트워크 플레이어의 아바타는 물리력을 이용하지 않음 
+            //(원래 게임이 이렇다는거다...우리건 안해도 체크 돼있음...)
+            myRbody.isKinematic = true;
+        }
+
+        // 원격 플래이어의 위치 및 회전 값을 처리할 변수의 초기값 설정 
+        // 잘 생각해보자 이런처리 안하면 순간이동 현상을 목격
+        currPos = myTr.position;
+        currRot = myTr.rotation;
+
+        // (네트워크 UI 버전에서 사용)////////////////////////////////////////
+        //현재의 생명력을 초기 생명값으로 초기값 설정 
+        life = initLife;
+
+        //Filled 이미지 색상을 파랑으로 셋팅 
+        hpBar.color = Color.blue;
+
+        /////////////////////////////////////////////////////////////////////////////////
     }
 
-IEnumerator Start()
+    IEnumerator Start()
     {
 
         yield return new WaitForSeconds(5.0f);
 
         // 일정 간격으로 주변의 가장 가까운 Enemy를 찾는 코루틴 
-        StartCoroutine(this.TargetSetting());
+        if(pv.isMine)
+        {
+            StartCoroutine(this.TargetSetting());
 
-        // 가장 가까운 적을 찾아 발사...
-        StartCoroutine(this.ShotSetting());
+            // 가장 가까운 적을 찾아 발사...
+            StartCoroutine(this.ShotSetting());
+        }
+
     }
 
     // Update is called once per frame
     void Update()
     {
+        if(pv.isMine)
+        {
+
+
         //Debug.Log(myTr.localRotation.y);//raidan
         //Debug.Log(myTr.localRotation.y * Mathf.Rad2Deg);//defree 수학적으로 이용할 degree
         //Debug.Log(myTr.rotation.eulerAngles.y);//degree
@@ -237,6 +362,12 @@ IEnumerator Start()
                 //일정 주기로 발사
                 ShotStart();
 
+                //(포톤 추가)원격 네트워크 플레이어의 자신의 아바타 플레이어에는 RPC로 원격으로 FireStart 함수를 호출 
+                pv.RPC("ShotStart", PhotonTargets.Others, null);
+
+                //(포톤 추가)모든 네트웍 유저에게 RPC 데이타를 전송하여 RPC 함수를 호출, 로컬 플레이어는 로컬 Fire 함수를 바로 호출 
+                //pv.RPC("ShotStart", PhotonTargets.All, null);
+
                 bulletSpeed = Time.time + 0.3f;
             }
         }
@@ -255,9 +386,9 @@ IEnumerator Start()
 
 
 
-#if UNITY_EDITOR
 
-        if (Input.GetMouseButtonDown(0)&&!isDie&&isMine)
+
+        if (Input.GetMouseButtonDown(0)&&!isDie)
         {
             if(Physics.Raycast(ray,out hitInfo1, Mathf.Infinity,1 <<LayerMask.NameToLayer("Barrel")))
             {
@@ -276,7 +407,14 @@ IEnumerator Start()
 
             }
         }
-#endif
+
+        }
+        //원격플레이어일때 수행
+        else
+        {
+            myTr.position = Vector3.Lerp(myTr.position, currPos, Time.deltaTime * 3.0f);
+            myTr.rotation = Quaternion.Slerp(myTr.rotation, currRot, Time.deltaTime * 3.0f);
+        }
     }
 
     IEnumerator TargetSetting()
@@ -343,7 +481,7 @@ IEnumerator Start()
             }
         }
     }
-
+    [PunRPC]
     private void ShotStart()
     {
         //Debug.Log(true);
@@ -414,6 +552,19 @@ IEnumerator Start()
             lifeBar.fillAmount += damage / 100.0f;
             //프로젝터로 피 효과
             damageProjector.farClipPlane -= damage / 20.0f;
+            // (네트워크 UI 버전에서 사용) //////////////////////////////////////////
+            //현재 생명력 백분율 = (현재 생명력) / (초기 생명력)
+            hpBar.fillAmount = (float)life / (float)initLife;
+
+            //생명력 수치에 따라 Filled 이미지의 색상을 변경 
+            if (hpBar.fillAmount <= 0.4f)
+            {
+                hpBar.color = Color.red;
+            }
+            else if (hpBar.fillAmount <= 0.6f)
+            {
+                hpBar.color = Color.yellow;
+            }
 
             // 생명력이 바닥이면 죽이자
             if (life <= 0)
@@ -456,6 +607,7 @@ IEnumerator Start()
         //애니메이션 스톱으로 Ragdoll 효과 
         anim.enabled = false;
 
+        hudCanvas.enabled = false;
         yield return null;
     }
     public void BarrelFire(Transform barrelTr)
@@ -463,4 +615,31 @@ IEnumerator Start()
         barrelPos = barrelTr;
         barrelFire = true;
     }
+
+    //네트워크 객체 생성완료시 자동 호출되는 함수
+    void onPhotonInstantiate(PhotonMessageInfo info)
+    {
+        object[] data = pv.instantiationData;
+        Debug.Log((int)data[0]);
+    }
+    void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
+    {
+        //로컬 플레이어의 위치 정보를 송신
+        if (stream.isWriting)
+        {
+            //박싱
+            stream.SendNext(myTr.position);
+            stream.SendNext(myTr.rotation);
+        }
+        //원격 플레이어의 위치 정보를 수신
+        else
+        {
+            //언박싱
+            currPos = (Vector3)stream.ReceiveNext();
+            currRot = (Quaternion)stream.ReceiveNext();
+        }
+
+    }
+
+
 }

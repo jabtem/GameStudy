@@ -13,7 +13,7 @@ public class BulletCtrl : MonoBehaviour
 
     float dist;
 
-
+    public int playerId = -1;
     // Start is called before the first frame update
     void Start()
     {

@@ -16,11 +16,14 @@ public class EnemyLife : MonoBehaviour
 
     public MeshRenderer lifeBar;
 
+    public PhotonView pv = null;    
+
 
     // Start is called before the first frame update
     void Awake()
     {
         myTr = GetComponent<Transform>();
+        pv = PhotonView.Get(this);
     }
 
     void OnCollisionEnter(Collision coll)
@@ -31,18 +34,44 @@ public class EnemyLife : MonoBehaviour
 
             CreateBlood(contact.point);
 
-            life -= coll.gameObject.GetComponent<BulletCtrl>().power;
-            lifeBar.material.SetFloat("_Progress", life / 100.0f);
+            // 포톤 추가
+            // 각 요소를 변수로 저장
+            int pow = coll.gameObject.GetComponent<BulletCtrl>().power;
+            int id = coll.gameObject.GetComponent<BulletCtrl>().playerId;
 
-            if(life <= 0)
-            {
-                enemy.EnemyDie();
-            }
+            //(포톤 추가)모든 네트웍 유저의 몬스터에 RPC 데이타를 전송하며 RPC 함수를 호출, 로컬 플레이어는 로컬 Deamage 함수를 바로 호출 
+            pv.RPC("Deamage", PhotonTargets.AllBuffered, pow, id);
+
+            //life -= coll.gameObject.GetComponent<BulletCtrl>().power;
+            //lifeBar.material.SetFloat("_Progress", life / 100.0f);
+
+            //if(life <= 0)
+            //{
+            //    enemy.EnemyDie();
+            //}
             enemy.HItEenmey();
         }
     }
+    [PunRPC]
+    //데미지 함수
+    void Deamage(int dam, int id)
+    {
+        //맞은 총알의 파워를 가져와 Enemy의 life를 감소
+        life -= dam;
+        //로컬적인 개념으로 머트리얼 셋팅
+        lifeBar.material.SetFloat("_Progress", life / 100.0f);
 
-     void OnCollision(object[] _params)
+
+        // 생명력이 바닥이면 죽이자
+        if (life <= 0)
+        {
+            // 포톤 추가
+            //자신을 파괴시킨 적 네트워크 베이스의 스코어를 증가시키는 함수를 호출함
+            StartCoroutine(this.SaveKillCount(id));
+            enemy.EnemyDie();
+        }
+    }
+    void OnCollision(object[] _params)
     {
         Debug.Log(string.Format("info{0} : {1}", _params[0], _params[1]));
 
@@ -104,5 +133,35 @@ public class EnemyLife : MonoBehaviour
         enemyblood2.localScale = Vector3.one * scale;
 
         yield return null;
+    }
+
+    // 포톤 추가
+    //자신을 파괴시킨 네트워크 베이스를 검색해서 스코어를 증가시켜주는 함수
+    IEnumerator SaveKillCount(int firePlayerId)
+    {
+
+        //Base 태그로 지정된 모든 네트워크 베이스를 가져와 배열에 저장
+        GameObject[] bases = GameObject.FindGameObjectsWithTag("Base");
+
+        // 전체 네트워크 베이스를 검색하여 총알의 주인을 찿아줌...
+        foreach (GameObject _base in bases)
+        {
+
+            var baseCtrl = _base.GetComponent<BaseCtrl>();
+
+            //네트워크베이스의 playerId가 총알의 playerId와 동일한지 판단
+            if (baseCtrl != null && baseCtrl.playerId == firePlayerId)
+            {
+
+                //동일한 베이스일 경우 스코어를 증가시켜줌
+                baseCtrl.PlusKillCount();
+                break;
+
+            }
+
+        }
+
+        yield return null;
+
     }
 }

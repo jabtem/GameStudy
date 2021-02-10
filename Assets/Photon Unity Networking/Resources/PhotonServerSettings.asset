@@ -44,4 +44,6 @@ MonoBehaviour:
   - RequestForPickupTimes
   - TaggedPlayer
   - LogMsg
+  - ShotStart
+  - Deamage
   DisableAutoOpenWizard: 1

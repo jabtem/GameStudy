@@ -13,6 +13,7 @@ TagManager:
   - Barrel
   - Team
   - ROOM_ITEM
+  - Mgr
   layers:
   - Default
   - TransparentFX

@@ -2197,7 +2197,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isDie: 0
-  txtKillCount: {fileID: 1444865437}
   dist1: 0
   dist2: 0
   EnemyTarget: {fileID: 0}
@@ -2214,8 +2213,10 @@ MonoBehaviour:
   damageEffect: {fileID: 100000, guid: d45b696357f69404c8c5feb73a8ebd19, type: 3}
   damageProjector: {fileID: 1572780702923094244}
   barrelFire: 0
-  barrelPos: {fileID: 0}
-  isMine: 0
+  camPivot: {fileID: 1572780703173551796}
+  hudCanvas: {fileID: 7194879635082890181}
+  hpBar: {fileID: 1544975994}
+  txtKillCount: {fileID: 1444865437}
 --- !u!143 &1572780703173551806
 CharacterController:
   m_ObjectHideFlags: 0
@@ -2506,6 +2507,11 @@ MonoBehaviour:
   fireSfx: {fileID: 0}
   rayLine: {fileID: 2029534203}
   rayDot: {fileID: 1933256693}
+  pv: {fileID: 0}
+  playerId: -1
+  killCount: 0
+  localPlayer: {fileID: 1572780703173551795}
+  lobby: 0
 --- !u!114 &141973201582761338
 MonoBehaviour:
   m_ObjectHideFlags: 0
